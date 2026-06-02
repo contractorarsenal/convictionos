@@ -19,7 +19,7 @@ export default async function DashboardPage() {
     .eq('id', user.id)
     .single()
 
-  if (profile && !profile.trader_style) redirect('/onboard')
+  if (!profile || !profile.username) redirect('/onboard')
 
   // Get this week's trades
   const weekStart = getWeekStart()
@@ -45,7 +45,7 @@ export default async function DashboardPage() {
     .eq('user_id', user.id)
     .order('week_start', { ascending: false })
     .limit(1)
-    .single()
+    .maybeSingle()
 
   const trades: Trade[] = weekTrades || []
   const recentTrades: Trade[] = (allTrades || []).slice(0, 8)
@@ -55,6 +55,11 @@ export default async function DashboardPage() {
   const losses = trades.filter(t => t.result_pct <= 0).length
   const winRate = trades.length > 0 ? Math.round((wins / trades.length) * 100) : 0
   const totalPnl = trades.reduce((acc, t) => acc + (t.pnl_usd || 0), 0)
+
+  // All-time W/L
+  const allTradesList: Trade[] = allTrades || []
+  const allWins = allTradesList.filter(t => t.result_pct > 0).length
+  const allLosses = allTradesList.filter(t => t.result_pct <= 0).length
   const avgConviction = trades.length > 0
     ? (trades.reduce((acc, t) => acc + t.conviction_level, 0) / trades.length).toFixed(1)
     : '—'
@@ -170,8 +175,8 @@ export default async function DashboardPage() {
           {/* Stats grid */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr', gap: '12px' }}>
             {[
-              { label: 'WIN RATE', value: trades.length ? `${winRate}%` : '—', sub: `${wins}W / ${losses}L`, color: winRate >= 50 ? 'var(--green)' : 'var(--red)' },
-              { label: 'TOTAL PNL', value: totalPnl !== 0 ? formatUSD(totalPnl) : '—', sub: `${trades.length} trades this week`, color: totalPnl >= 0 ? 'var(--green)' : 'var(--red)' },
+              { label: 'THIS WEEK W/L', value: trades.length ? `${winRate}%` : '—', sub: `${wins}W / ${losses}L this week`, color: winRate >= 50 ? 'var(--green)' : 'var(--red)' },
+              { label: 'ALL-TIME W/L', value: allTradesList.length ? `${allWins}W / ${allLosses}L` : '—', sub: `${allTradesList.length} total trades`, color: allWins >= allLosses ? 'var(--green)' : 'var(--red)' },
               { label: 'AVG CONVICTION', value: avgConviction, sub: 'out of 5', color: 'var(--text)' },
               { label: 'TOP EMOTION', value: topEmotion ? topEmotion[0].toUpperCase() : '—', sub: topEmotion ? `${topEmotion[1]} trades` : 'no data yet', color: topEmotion?.[0] === 'calm' || topEmotion?.[0] === 'confident' ? 'var(--green)' : topEmotion?.[0] === 'fomo' || topEmotion?.[0] === 'revenge' ? 'var(--red)' : 'var(--yellow)' },
             ].map(stat => (
